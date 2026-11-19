@@ -1,5 +1,5 @@
 /* 오프라인용: 앱 파일과 OpenCV 를 기기에 저장해 두고, 인터넷이 없어도 열리게 함 */
-const CACHE = "score-reader-v1";
+const CACHE = "score-reader-v2";   // 버전이 바뀌면 숫자를 올려서 새 파일을 받게 함
 const FILES = ["./", "index.html", "app.js", "reader.js", "manifest.webmanifest", "vendor/opencv.js", "icons/icon-192.png", "icons/icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {

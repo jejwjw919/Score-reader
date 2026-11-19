@@ -13,6 +13,16 @@
     return e;
   };
   const VERSION = "1.1.0";
+  // 업데이트 기록: [버전, 날짜, [바뀐 점]]  새 버전을 처음 열면 맨 위 항목을 한 번 보여줌
+  const CHANGELOG = [
+    ["1.1.0", "2026-11-19", [
+      "업데이트 기록 추가 (설정 맨 아래). 새 버전을 처음 열면 바뀐 점을 한 번 보여줘요",
+      "PC 프로그램(1.6)에서도 같은 백업 파일을 내보내고 가져올 수 있어요 (PC → 폰, 폰 → PC)"]],
+    ["1.0.0", "2026-11-18", [
+      "첫 버전: 읽기 · 학습 · 상수표 · 기록(포텐셜) · 설정",
+      "사진은 폰 안에서만 처리, 한 번 열면 인터넷 없이도 사용",
+      "PC 프로그램의 학습 데이터를 백업 파일로 가져오기"]],
+  ];
   const BOM = String.fromCharCode(0xFEFF);    // CSV 를 엑셀에서 열 때 한글이 깨지지 않게
   let R = null;           // 인식 엔진 (OpenCV 준비 후)
   let db = null;          // 모든 데이터 (IndexedDB 에 저장)
@@ -23,7 +33,7 @@
     async get(k) { const d = await this.open(); return new Promise((res, rej) => { const q = d.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); },
     async set(k, v) { const d = await this.open(); return new Promise((res, rej) => { const t = d.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); },
   };
-  const emptyDb = () => ({ glyphs: {}, labels: {}, colors: {}, anchors: {}, songs: {}, table: "", records: {}, sheetPaste: "", __v: 1 });
+  const emptyDb = () => ({ glyphs: {}, labels: {}, colors: {}, anchors: {}, songs: {}, table: "", records: {}, __v: 1 });
   async function loadDb() {
     try { db = (await IDB.get("db")) || emptyDb(); } catch (e) { db = emptyDb(); toast("저장소를 열 수 없어 이번에만 쓰는 모드로 동작해요"); }
     db.__v = (db.__v || 0) + 1;
@@ -268,7 +278,6 @@
   }
   function renderRecords() {
     const rows = potentialRows(), L = $("#rList"); L.innerHTML = "";
-    if (!$("#sheetIn").value && db.sheetPaste) $("#sheetIn").value = db.sheetPaste;
     const noConst = Object.keys(db.records).length - rows.length;
     $("#rInfo").innerHTML = "";
     $("#rInfo").append(el("b", {}, `기록 ${rows.length}곡`), rows.length ? ` · 최고 ${rows[0].p.toFixed(3)} (${rows[0].song} [${S.TAG_NAME[rows[0].tag]}])` : "",
@@ -290,48 +299,6 @@
     if (!n) { toast("지울 기록이 없어요"); return; }
     if (!await confirmBox("⚠ 모든 기록 초기화", `정말 모든 점수 기록 ${n}곡을 지울까요?\n되돌릴 수 없어요. 필요하면 먼저 설정 → 백업 내보내기를 하세요.`, "모두 지우기", true)) return;
     db.records = {}; save(); renderRecords(); toast("모든 기록을 지웠어요");
-  });
-
-  // 스프레드시트 점수 칸: 붙여넣은 시트(곡명 ⇥ 난이도 ⇥ … ⇥ 점수)와 같은 순서로 점수만 만들기
-  const SHEET_BASE = 10000000;
-  function sheetScores(text) {
-    const out = [], st = { lines: 0, mine: 0, up: 0, none: 0, bad: [] };
-    for (const ln of S.splitlines(text)) {
-      const cells = ln.split("\t").map(c => { c = c.trim(); return /^".*"$/.test(c) ? c.slice(1, -1).replace(/""/g, '"') : c; });
-      const song = cells[0] || "", d = (cells[1] || "").toUpperCase();
-      const oldTxt = cells.length > 2 ? cells[cells.length - 1] : "";
-      const tag = S.TAG_ORDER.includes(d) ? d : S.DIFF_TAG[d];
-      if (!song) { out.push(oldTxt); continue; }
-      st.lines++;
-      if (!tag) { out.push(oldTxt); if (st.bad.length < 5) st.bad.push(`${song} (난이도 '${cells[1] || ""}')`); continue; }
-      const old = S.scoreValue(oldTxt), rec = db.records[recKey(song, tag)], mine = rec ? rec.score : 0;
-      if (!mine) { st.none++; out.push(oldTxt); continue; }
-      st.mine++;
-      if (mine <= old) { out.push(oldTxt); continue; }
-      st.up++; out.push(String(mine >= SHEET_BASE ? mine - SHEET_BASE : mine));
-    }
-    return [out, st];
-  }
-  async function copyText(t) {
-    try { await navigator.clipboard.writeText(t); return true; }
-    catch (e) {
-      const ta = el("textarea", { style: "position:fixed;top:0;left:0;opacity:0" }); ta.value = t; document.body.append(ta); ta.select();
-      let ok = false; try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
-      ta.remove(); return ok;
-    }
-  }
-  $("#sheetBtn").addEventListener("click", async () => {
-    const text = $("#sheetIn").value;
-    if (!text.trim()) { toast("시트에서 곡명~점수 칸을 복사해 붙여넣어 주세요"); return; }
-    const [out, st] = sheetScores(text);
-    if (!st.lines) { toast("곡명을 찾지 못했어요. 곡명 칸부터 복사했는지 확인해 주세요"); return; }
-    if (db.sheetPaste !== text) { db.sheetPaste = text; save(); }
-    const result = out.join("\n"), ok = await copyText(result);
-    const O = $("#sheetOut"); O.value = result; O.classList.toggle("hide", ok);
-    $("#sheetMsg").textContent = `${out.length}줄 ${ok ? "복사했어요" : "을 만들었어요. 자동 복사가 안 돼서 아래 칸을 길게 눌러 복사하세요"}.\n` +
-      `내 기록 있음 ${st.mine}곡 중 시트보다 높아서 바뀐 곳 ${st.up}곡 · 내 기록 없음 ${st.none}곡 (시트 값 그대로)` +
-      (st.bad.length ? `\n난이도를 몰라 그대로 둔 줄: ${st.bad.join(", ")}` : "");
-    if (ok) toast(`점수 ${out.length}줄 복사됨 · 시트 점수 칸 첫 줄에 붙여넣으세요`);
   });
 
   // ---------- 설정 탭 ----------
@@ -357,7 +324,24 @@
     for (const [ok, t, d, m, btn, fn] of steps)
       box.append(el("div", { class: "st" + (ok ? " done" : "") }, el("div", { class: "dot" }), el("div", {}, el("b", {}, t), el("div", { class: "muted" }, d), el("div", { class: "m", style: "white-space:pre-wrap" }, m)),
         el("button", { class: "small", onclick: fn }, btn)));
+    renderChangelog();
     $("#ver").textContent = `Score Reader 모바일 ${VERSION}` + (navigator.serviceWorker && navigator.serviceWorker.controller ? " · 오프라인 사용 가능" : "");
+  }
+
+  function renderChangelog() {
+    const b = $("#clogBody"); b.innerHTML = "";
+    for (const [ver, date, items] of CHANGELOG) {
+      b.append(el("div", { class: "clv" }, `버전 ${ver}`, el("small", {}, date)));
+      const ul = el("ul", { class: "cli" }); for (const it of items) ul.append(el("li", {}, it)); b.append(ul);
+    }
+  }
+  async function whatsNew() {        // 새 버전을 처음 열면 한 번
+    let seen = null; try { seen = await IDB.get("seenVersion"); } catch (e) { return; }
+    if (seen === VERSION) return;
+    try { await IDB.set("seenVersion", VERSION); } catch (e) { /* 무시 */ }
+    if (!seen && !Object.keys(db.records || {}).length && !(db.table || "").length) return;   // 완전히 처음 쓰는 사람에게는 생략
+    const [ver, date, items] = CHANGELOG[0];
+    dialog(`버전 ${ver} 업데이트`, `${date}\n\n` + items.map(i => "•  " + i).join("\n") + "\n\n전체 기록은 설정 맨 아래에 있어요.", [["확인", true, "primary"]]);
   }
 
   // 기준 글자: 사진 위에 상자 두 개 그리기
@@ -407,14 +391,14 @@
       glyphs: Object.fromEntries(Object.entries(db.glyphs).map(([g, l]) => [g, l.map(t => ({ ch: t.ch, ...pk(t) }))])),
       labels: Object.fromEntries(Object.entries(db.labels).map(([k, l]) => [k, l.map(t => ({ label: t.label, ...pk(t) }))])),
       colors: db.colors, anchors: Object.fromEntries(Object.entries(db.anchors || {}).map(([n, a]) => [n, pk(a)])),
-      songs: db.songs, table: db.table, records: db.records, sheetPaste: db.sheetPaste || "" };
+      songs: db.songs, table: db.table, records: db.records };
   }
   function fromBackup(b) {
     const B = S.b64ToBytes, un = t => ({ w: t.w, h: t.h, data: B(t.b64) }), d = emptyDb();
     for (const [g, l] of Object.entries(b.glyphs || {})) d.glyphs[g] = l.map(t => ({ ch: t.ch, ...un(t) }));
     for (const [k, l] of Object.entries(b.labels || {})) d.labels[k] = l.map(t => ({ label: t.label, ...un(t) }));
     for (const [n, a] of Object.entries(b.anchors || {})) d.anchors[n] = un(a);
-    d.colors = b.colors || {}; d.songs = b.songs || {}; d.table = b.table || ""; d.sheetPaste = b.sheetPaste || "";
+    d.colors = b.colors || {}; d.songs = b.songs || {}; d.table = b.table || "";
     for (const [k, r] of Object.entries(b.records || {})) if (r && r.score > 0) d.records[k] = { score: r.score, song: r.song, tag: r.tag, at: r.at || b.exported };
     return d;
   }
@@ -452,6 +436,7 @@
     $("#loading").remove();
     const ready = R.hasAnchors(db) && tableRows().length;
     show(ready ? "read" : "set");
+    whatsNew();
     if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
   })();
 })();
