@@ -183,6 +183,15 @@ details[open] summary::after{content:" ▴"}
       <p class="muted" style="margin:6px 0 0">10,000k 이상: 상수+2.0+0.2 · 9,800k 이상: 상수+1.0+(점수−9,800,000)/200,000+0.2 · 그 아래: 상수+(점수−9,500,000)/300,000+0.2</p></div>
     <div class="list" id="rList"></div>
     <div class="row" style="margin-top:12px"><button class="grow" id="rCsv">CSV로 내보내기</button><button class="danger grow" id="rReset">⚠ 모든 기록 초기화…</button></div>
+    <div class="card" style="margin-top:12px">
+      <details id="sheetCard"><summary>스프레드시트 점수 칸 만들기</summary>
+        <p class="muted">시트에서 <b>곡명부터 점수까지</b>(예: C5:H 끝까지) 복사해 아래에 붙여넣고 버튼을 누르면, 같은 순서로 <b>점수 칸만</b> 복사돼요. 시트의 점수 칸 첫 줄(예: H5)을 누르고 붙여넣으세요.<br>내 기록이 시트보다 높을 때만 바뀌고, 나머지는 시트 값 그대로예요. 10,000,000점 이상은 시트처럼 10,000,000을 뺀 값으로 넣어요 (10,000,635 → 635). 붙여넣은 목록은 기억해 두니 다음부터는 버튼만 누르면 돼요.</p>
+        <textarea id="sheetIn" placeholder="여기에 붙여넣기 (곡명 · 난이도 · … · 점수)"></textarea>
+        <button class="primary big" id="sheetBtn" style="margin-top:8px">점수 칸 복사</button>
+        <p class="muted" id="sheetMsg" style="white-space:pre-wrap"></p>
+        <textarea id="sheetOut" class="hide" readonly></textarea>
+      </details>
+    </div>
   </section>
 
   <!-- 설정 -->
